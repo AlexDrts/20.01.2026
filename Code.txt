@@ -1,0 +1,143 @@
+/* ============================================================
+   INNER JOIN
+============================================================ */
+
+/* 1. Товари постачальників Bakery Supply або MeatLine */
+SELECT p.name AS product_name, c.name AS category_name
+FROM Product p
+INNER JOIN Category c ON p.id_category = c.id
+INNER JOIN Delivery d ON p.id = d.id_product
+INNER JOIN Supplier s ON d.id_supplier = s.id
+WHERE s.name IN (N'Bakery Supply', N'MeatLine', N'FoodTrade UA', N'DairyImport');
+
+
+/* 2. Товари з постачальником:
+      виробник без літер [АКМ], категорія не "Крупи" */
+SELECT p.name AS product_name, s.name AS supplier_name
+FROM Product p
+INNER JOIN Producer pr ON p.id_producer = pr.id
+INNER JOIN Category c ON p.id_category = c.id
+INNER JOIN Delivery d ON p.id = d.id_product
+INNER JOIN Supplier s ON d.id_supplier = s.id
+WHERE pr.name NOT LIKE N'%А%'
+  AND pr.name NOT LIKE N'%К%'
+  AND pr.name NOT LIKE N'%М%'
+  AND c.name <> N'Крупи';
+
+
+/* 3. Товари + категорія + постачальник + країна виробника
+      країна не Україна, Молдова, Польща
+      ціна < 50
+      дата з 10.02.2025 */
+SELECT p.name AS product_name,
+       c.name AS category_name,
+       s.name AS supplier_name,
+       co.name AS country_name
+FROM Product p
+INNER JOIN Category c ON p.id_category = c.id
+INNER JOIN Producer pr ON p.id_producer = pr.id
+INNER JOIN Address a ON pr.id_adress = a.id
+INNER JOIN City ci ON a.id_city = ci.id
+INNER JOIN Region r ON ci.id_region = r.id
+INNER JOIN Country co ON r.id_country = co.id
+INNER JOIN Delivery d ON p.id = d.id_product
+INNER JOIN Supplier s ON d.id_supplier = s.id
+WHERE co.name NOT IN (N'Молдова', N'Польща', N'Франція')
+  AND d.price < 50
+  AND d.date_of_delivery >= '2025-09-30';
+
+
+/* 4. Кондитерські та безалкогольні товари, продано > 100 */
+SELECT p.name AS product_name,
+       pr.name AS producer_name,
+       s.name AS supplier_name
+FROM Product p
+INNER JOIN Category c ON p.id_category = c.id
+INNER JOIN Sale sa ON p.id = sa.id_product
+INNER JOIN Producer pr ON p.id_producer = pr.id
+INNER JOIN Delivery d ON p.id = d.id_product
+INNER JOIN Supplier s ON d.id_supplier = s.id
+GROUP BY p.name, pr.name, s.name
+HAVING SUM(sa.quantity) > 100;
+
+
+/* 5. Поставки: 3 постачальники, сортування за назвою товару */
+SELECT p.name AS product_name,
+       s.name AS supplier_name,
+       c.name AS category_name,
+       d.date_of_delivery,
+       d.price * d.quantity AS total_cost
+FROM Delivery d
+INNER JOIN Product p ON d.id_product = p.id
+INNER JOIN Supplier s ON d.id_supplier = s.id
+INNER JOIN Category c ON p.id_category = c.id
+WHERE s.name IN (N'JuiceTrade', N'MilkGroup', N'DairyImport')
+ORDER BY p.name;
+
+
+/* 6. Продажі:
+      без двох виробників,
+      сортування за спаданням суми */
+SELECT p.name AS product_name,
+       pr.name AS producer_name,
+       CONCAT(co.name, ', ', ci.name, ', ', a.street) AS full_address,
+       c.name AS category_name,
+       sa.date_of_sale,
+       sa.price * sa.quantity AS total_sale
+FROM Sale sa
+INNER JOIN Product p ON sa.id_product = p.id
+INNER JOIN Producer pr ON p.id_producer = pr.id
+INNER JOIN Address a ON pr.id_adress = a.id
+INNER JOIN City ci ON a.id_city = ci.id
+INNER JOIN Region r ON ci.id_region = r.id
+INNER JOIN Country co ON r.id_country = co.id
+INNER JOIN Category c ON p.id_category = c.id
+WHERE pr.name NOT IN (N'КОМО', N'Coca-Cola Company')
+ORDER BY total_sale DESC;
+
+
+/* ============================================================
+   OUTER JOIN 
+============================================================ */
+
+/* 7. Товари та їх виробники + виробники без товарів */
+SELECT p.name AS product_name, pr.name AS producer_name
+FROM Producer pr
+LEFT JOIN Product p ON pr.id = p.id_producer;
+
+
+/* 8. Категорії, до яких не належить жоден товар */
+SELECT c.name
+FROM Category c
+LEFT JOIN Product p ON c.id = p.id_category
+WHERE p.id IS NULL;
+
+
+/* 9. Товари, дати поставок і постачальники
+      + постачальники без поставок */
+SELECT p.name AS product_name,
+       d.date_of_delivery,
+       s.name AS supplier_name
+FROM Supplier s
+LEFT JOIN Delivery d ON s.id = d.id_supplier
+LEFT JOIN Product p ON d.id_product = p.id;
+
+
+/* 10. Категорії без товарів фірми ООО «Нлі Ю» */
+SELECT name FROM Category
+EXCEPT
+SELECT c.name
+FROM Product p
+INNER JOIN Category c ON p.id_category = c.id
+INNER JOIN Producer pr ON p.id_producer = pr.id
+WHERE pr.name = N'ООО «Нлі Ю»';
+
+
+/* 11. Виробники, які не випускають молочну продукцію */
+SELECT name FROM Producer
+EXCEPT
+SELECT pr.name
+FROM Producer pr
+INNER JOIN Product p ON pr.id = p.id_producer
+INNER JOIN Category c ON p.id_category = c.id
+WHERE c.name = N'Молочні продукти';
